@@ -36,13 +36,13 @@ def site_config():
     )
 
     # Download video from youtube (convert to mkv). Ignore playlist if the url refers to a video and a playlist.
-    add_site(  # Youtube -> Video
-        "youtube.",
-        "yt-dlp -q --remux-video mkv --no-playlist --embed-metadata "
-        "--embed-thumbnail --embed-chapters --embed-info-json",
-        0,
-        True
-    )
+    #add_site(  # Youtube -> Video
+    #    "youtube.",
+    #    "yt-dlp -q --remux-video mkv --no-playlist --embed-metadata "
+    #    "--embed-thumbnail --embed-chapters --embed-info-json",
+    #    0,
+    #    True
+    #)
 
     # Download mp3 or wav (if available) from soundcloud. Convert wav files to mp3.
     add_site(  # Soundcloud -> MP3
@@ -57,7 +57,7 @@ def site_config():
         "default.",
         "yt-dlp -q --remux-video mp4 --embed-metadata --embed-thumbnail --embed-chapters --embed-info-json",
         0,
-        False
+        True
     )
 
 
@@ -86,7 +86,7 @@ def download(queue):
 
         print("Downloading [" + download_nr + "/" + str(len(links)) + "]  " + str(url).split('://')[-1])
 
-        os.system(conf[Config.CMD] + " '" + url + "'")
+        os.system(conf[Config.CMD] + ' "' + url + '"')
         time.sleep(conf[Config.TIMEOUT])
 
         queue.task_done()
@@ -107,13 +107,15 @@ def add_site(url_dot, dl_command, dl_timeout, dl_again):
 def notification(msg):
     if platform == "linux" or platform == "linux2":  # linux2 deprecated from python3.3 onwards
         os.system("notify-send '" + msg + "'")
-    elif platform == "darwin":
-        os.system("osascript -e 'display notification \"" + msg + "\"'")
-    elif platform == "win32":
-        os.system('createobject("wscript.shell").popup "cld.py", 5, "' + msg + '", 64')
+
+    # commented because currently unable to test if working
+    #elif platform == "darwin":
+     #   os.system("osascript -e 'display notification \"" + msg + "\"'")
+    #elif platform == "win32":
+     #   os.system('createobject("wscript.shell").popup "cld.py", 5, "' + msg + '", 64')
 
 
-# Windows...
+
 
 #
 # Main Function and endless loop
@@ -136,20 +138,22 @@ def main():
     for link in links:
         conf_available = False
 
-        for config in configs:
-            if config[Config.SITE] in link:
-                conf_available = True
-                if config[Config.RE_DL]:
-                    queue_download(config, link)
-
-        if not conf_available:
+        if validators.url(link):
             for config in configs:
-                if "default." in config:
+                if config[Config.SITE] in link:
+                    conf_available = True
                     if config[Config.RE_DL]:
                         queue_download(config, link)
 
+            if not conf_available:
+                for config in configs:
+                    if "default." in config:
+                        if config[Config.RE_DL]:
+                            queue_download(config, link)
+
     dl_worker = Thread(target=download, args=(dlq,))
     dl_worker.daemon = True
+    dl_worker.start()  # start download thread for links from the log
 
     while True:
         time.sleep(1 / polling_interval_hz)
